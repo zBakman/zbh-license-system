@@ -16,8 +16,8 @@ app = Flask(__name__)
 
 # GÜVENLİK ANAHTARLARI (GitHub'a atarken burayı .env dosyasından çekecek)
 app.secret_key = os.getenv('SECRET_KEY', 'zbh_holding_gizli_anahtar_999')
-ADMIN_USER = os.getenv('ADMIN_USER', 'admin')
-ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123')
+ADMIN_USER = os.getenv('ADMIN_USER')
+ADMIN_PASS = os.getenv('ADMIN_PASS')
 DB_NAME = "zbh_system.db"
 SECRET_SALT = "ZBH_GHOST_PROTOCOL_78" # Free key şifreleme tuzu
 
@@ -346,4 +346,5 @@ if __name__ == '__main__':
     # 0.0.0.0 ile dış dünyaya açılır (Port açtıysan veya Render'da)
     # Port env'den alınır, yoksa 5000 kullanılır
     port = int(os.environ.get("PORT", 5000))
+
     app.run(host='0.0.0.0', port=port)
