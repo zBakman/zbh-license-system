@@ -10,42 +10,48 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, s
 from functools import wraps
 from dotenv import load_dotenv
 
-# ==========================================
-# 1. AYARLAR VE GÜVENLİK
-# ==========================================
+# =================================================================
+# 1. AYARLAR, GÜVENLİK VE BAŞLANGIÇ
+# =================================================================
 load_dotenv()
 app = Flask(__name__)
 
-# --- ORTAM DEĞİŞKENLERİ ---
-app.secret_key = os.getenv('SECRET_KEY', 'zbh_root_key_v1')
-ADMIN_USER = os.getenv('ADMIN_USER', 'admin') # Render'dan ayarla
-ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123') # Render'dan ayarla
+# --- ORTAM DEĞİŞKENLERİ (RENDER'DAN ALIR) ---
+app.secret_key = os.getenv('SECRET_KEY', 'zbh_root_key_v1_gizli')
+ADMIN_USER = os.getenv('ADMIN_USER', 'admin') 
+ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123') 
 DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK', '')
-DATABASE_URL = os.getenv('DATABASE_URL') # Render'dan gelen PostgreSQL Linki
+DATABASE_URL = os.getenv('DATABASE_URL') 
 
-# --- GÜVENLİK SABİTLERİ ---
-BLOCK_TIME = 600  # 10 Dakika Ban
-MAX_ATTEMPTS = 5  # 5 Hatalı Giriş Hakkı
-IS_LOCKDOWN = False # Panic Modu Başlangıçta Kapalı
-failed_attempts = {} # RAM üzerinde IP takibi
+# --- GÜVENLİK AYARLARI ---
+BLOCK_TIME = 600  # 10 Dakika (Saniye cinsinden) ban süresi
+MAX_ATTEMPTS = 5  # Kaç kere yanlış girerse banlasın?
+IS_LOCKDOWN = False # Panic Mode (Sistemi kilitleme) başlangıçta kapalı
+failed_attempts = {} # Geçici hafıza (RAM) üzerinde IP takibi
 
-# ==========================================
-# 2. VERİTABANI BAĞLANTISI (POSTGRESQL)
-# ==========================================
+# =================================================================
+# 2. VERİTABANI BAĞLANTISI (POSTGRESQL - KALICI HAFIZA)
+# =================================================================
 def get_db_connection():
+    """PostgreSQL veritabanına bağlanır."""
     if not DATABASE_URL:
-        print("HATA: DATABASE_URL Bulunamadı!")
+        print("HATA: DATABASE_URL Environment Variable bulunamadı!")
         return None
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    return conn
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        return conn
+    except Exception as e:
+        print(f"DB Bağlantı Hatası: {e}")
+        return None
 
 def init_db():
-    """Tabloları PostgreSQL formatında oluşturur."""
+    """Tablolar yoksa oluşturur (İlk kurulum için)."""
     try:
         conn = get_db_connection()
+        if not conn: return
         cur = conn.cursor()
         
-        # KEYS Tablosu
+        # KEYS Tablosu (Kullanıcılar)
         cur.execute('''
             CREATE TABLE IF NOT EXISTS keys (
                 key_code VARCHAR(100) PRIMARY KEY,
@@ -58,7 +64,7 @@ def init_db():
             );
         ''')
         
-        # MAPPING Tablosu (SERIAL kullanılır)
+        # MAPPING Tablosu (Oyun - Script Eşleşmesi)
         cur.execute('''
             CREATE TABLE IF NOT EXISTS mapping (
                 id SERIAL PRIMARY KEY,
@@ -68,7 +74,7 @@ def init_db():
             );
         ''')
         
-        # LOGS Tablosu
+        # LOGS Tablosu (Kayıt Defteri)
         cur.execute('''
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id SERIAL PRIMARY KEY,
@@ -81,40 +87,48 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print("✅ Veritabanı Tabloları Hazır!")
+        print("✅ Veritabanı Tabloları Başarıyla Kontrol Edildi.")
     except Exception as e:
         print(f"❌ DB INIT ERROR: {e}")
 
-# Başlangıçta tabloları kontrol et
+# Server başlarken veritabanını kontrol et
 init_db()
 
-# ==========================================
-# 3. YARDIMCI FONKSİYONLAR
-# ==========================================
+# =================================================================
+# 3. YARDIMCI FONKSİYONLAR (LOGLAMA VE GİRİŞ KONTROLÜ)
+# =================================================================
 def log_action(action, details, notify_discord=False, color=0x00ff00):
+    """Hem veritabanına hem Discord'a log basar."""
     try:
+        # DB'ye Yaz
         conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO audit_logs (action, details) VALUES (%s, %s)", (action, details))
-        conn.commit()
-        cur.close()
-        conn.close()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("INSERT INTO audit_logs (action, details) VALUES (%s, %s)", (action, details))
+            conn.commit()
+            cur.close()
+            conn.close()
 
+        # Discord'a Gönder
         if notify_discord and DISCORD_WEBHOOK:
             payload = {
                 "embeds": [{
                     "title": f"🛡️ ZBH SYSTEM | {action}",
                     "description": details,
                     "color": color,
-                    "footer": {"text": "Security Protocol"},
+                    "footer": {"text": "Security Protocol v2.0"},
                     "timestamp": datetime.datetime.now().isoformat()
                 }]
             }
-            requests.post(DISCORD_WEBHOOK, json=payload, timeout=2)
+            try:
+                requests.post(DISCORD_WEBHOOK, json=payload, timeout=2)
+            except:
+                pass # Discord hatası sistemi durdurmasın
     except Exception as e:
         print(f"LOG ERROR: {e}")
 
 def login_required(f):
+    """Admin paneline giriş yapılmamışsa login sayfasına atar."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'logged_in' not in session:
@@ -122,9 +136,9 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ==========================================
-# 4. WEB SAYFALARI (FRONTEND)
-# ==========================================
+# =================================================================
+# 4. WEB SAYFALARI (HTML ARAYÜZÜ)
+# =================================================================
 @app.route('/')
 def index():
     return redirect(url_for('dashboard')) if 'logged_in' in session else redirect(url_for('login'))
@@ -132,13 +146,14 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
+        # Admin kullanıcı adı ve şifre kontrolü
         if request.form['username'] == ADMIN_USER and request.form['password'] == ADMIN_PASS:
             session['logged_in'] = True
-            log_action("ADMIN_LOGIN", f"Login from {request.remote_addr}", True, 0x00FF00)
+            log_action("ADMIN_LOGIN", f"Login successful from IP: {request.remote_addr}", True, 0x00FF00)
             return redirect(url_for('dashboard'))
         else:
-            log_action("FAILED_LOGIN", f"IP: {request.remote_addr}", True, 0xFF0000)
-            return render_template('login.html', error="Hatalı Şifre Aga!")
+            log_action("FAILED_LOGIN", f"Failed attempt from IP: {request.remote_addr}", True, 0xFF0000)
+            return render_template('login.html', error="Hatalı Bilgi Aga! Zorlama kapıyı.")
     return render_template('login.html')
 
 @app.route('/logout')
@@ -151,14 +166,18 @@ def logout():
 def dashboard():
     conn = get_db_connection()
     cur = conn.cursor()
-    # İstatistikler
+    
+    # İstatistikleri Çek
     try:
         cur.execute("SELECT COUNT(*) FROM keys")
         total = cur.fetchone()[0]
+        
         cur.execute("SELECT COUNT(*) FROM keys WHERE status='active'")
         active = cur.fetchone()[0]
+        
         cur.execute("SELECT COUNT(*) FROM keys WHERE type='VIP'")
         vip = cur.fetchone()[0]
+        
         cur.execute("SELECT COUNT(*) FROM keys WHERE status='banned'")
         banned = cur.fetchone()[0]
     except:
@@ -172,7 +191,8 @@ def dashboard():
 @login_required
 def users():
     conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor) # Veriyi sözlük gibi çek
+    # RealDictCursor sayesinde veriyi user['key_code'] şeklinde çekebiliriz
+    cur = conn.cursor(cursor_factory=RealDictCursor) 
     cur.execute("SELECT * FROM keys ORDER BY created_at DESC")
     keys = cur.fetchall()
     cur.close()
@@ -206,29 +226,32 @@ def audit_logs():
 def settings():
     return render_template('settings.html', active_page='settings')
 
-# ==========================================
-# 5. API MOTORU (TEKNİK KISIM)
-# ==========================================
+# =================================================================
+# 5. API SİSTEMİ (ROBLOX SCRIPT'IN KONUŞTUĞU YER)
+# =================================================================
 
 @app.route('/api/verify', methods=['GET'])
 def verify():
     global IS_LOCKDOWN
     client_ip = request.remote_addr
     
-    # 1. PANIC MODE KONTROLÜ
+    # --- 1. PANIC MODE KONTROLÜ ---
     if IS_LOCKDOWN:
-        return jsonify({"status": "error", "msg": "SYSTEM LOCKDOWN"})
+        return jsonify({"status": "error", "msg": "SYSTEM LOCKDOWN ACTIVE"})
 
-    # 2. RATE LIMIT (Anti-Spam)
+    # --- 2. ANTI-SPAM (RATE LIMIT) ---
     current_time = time.time()
     if client_ip in failed_attempts:
         attempts, first_time = failed_attempts[client_ip]
         if attempts >= MAX_ATTEMPTS:
+            # Süre dolmuş mu?
             if current_time - first_time < BLOCK_TIME:
-                return jsonify({"status": "error", "msg": "BLOCKED: Too Many Requests"})
+                remaining = int(BLOCK_TIME - (current_time - first_time))
+                return jsonify({"status": "error", "msg": f"BLOCKED: Too Many Requests ({remaining}s)"})
             else:
-                del failed_attempts[client_ip]
+                del failed_attempts[client_ip] # Affet
 
+    # --- 3. PARAMETRE KONTROLÜ ---
     key = request.args.get('key')
     hwid = request.args.get('hwid')
     place_id = request.args.get('placeid')
@@ -238,7 +261,7 @@ def verify():
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     
-    # Güvenli Sorgu
+    # Key'i veritabanında ara
     cur.execute("SELECT * FROM keys WHERE key_code = %s", (key,))
     user = cur.fetchone()
     
@@ -248,35 +271,46 @@ def verify():
         if user['status'] == 'banned':
             response['msg'] = "ACCOUNT_BANNED"
         elif not user['hwid']:
-            # İlk Giriş: HWID Kilitle
+            # İlk giriş: HWID'yi kilitle
             cur2 = conn.cursor()
             cur2.execute("UPDATE keys SET hwid = %s, ip_address = %s WHERE key_code = %s", (hwid, client_ip, key))
             conn.commit()
             cur2.close()
             response = {"status": "success", "type": user['type']}
+            # Logla (Sadece ilk girişte)
+            log_action("FIRST_LOGIN", f"Key: {key} bound to HWID", True, 0x00FFFF)
+            
         elif user['hwid'] != hwid:
+            # HWID Uyuşmazlığı
             response['msg'] = "HWID_MISMATCH"
-            # Hata Puanı Ekle
+            # Hata puanı ekle
             if client_ip not in failed_attempts: failed_attempts[client_ip] = [1, current_time]
             else: failed_attempts[client_ip][0] += 1
+            log_action("SECURITY_ALERT", f"HWID Mismatch! Key: {key} IP: {client_ip}", True, 0xFF0000)
+            
         else:
+            # Başarılı Giriş
             response = {"status": "success", "type": user['type']}
-            # IP Güncelle
+            # Son IP'yi güncelle
             cur2 = conn.cursor()
             cur2.execute("UPDATE keys SET ip_address = %s WHERE key_code = %s", (client_ip, key))
             conn.commit()
             cur2.close()
 
-    # Script URL Çekme
+    # --- 4. SCRIPT URL GÖNDERME ---
     if response['status'] == 'success':
+        # Mapping tablosundan scripti bul
         cur.execute("SELECT script_url FROM mapping WHERE place_id = %s", (place_id,))
         script = cur.fetchone()
-        response['script_url'] = script['script_url'] if script else ""
-        if client_ip in failed_attempts: del failed_attempts[client_ip] # Başarılıysa affet
         
-        # Sadece VIP girişlerini logla (DB şişmesin diye)
+        response['script_url'] = script['script_url'] if script else ""
+        
+        # IP cezasını sil (Başarılı girdi çünkü)
+        if client_ip in failed_attempts: del failed_attempts[client_ip]
+        
+        # VIP girişlerini logla (İsteğe bağlı)
         if user and user['type'] == 'VIP':
-            log_action("VIP_ACCESS", f"User: {key} entered Game: {place_id}")
+            pass # DB şişmesin diye her girişi loglamıyoruz, istersen burayı aç.
 
     cur.close()
     conn.close()
@@ -294,6 +328,7 @@ def generate_key():
     expires_at = datetime.datetime.now() + datetime.timedelta(days=days)
     
     prefix = "ZBH-VIP" if is_vip else "ZBH-GEN"
+    # Rastgele benzersiz key üret
     key_code = f"{prefix}-{str(uuid.uuid4())[:8].upper()}"
     
     conn = get_db_connection()
@@ -306,22 +341,24 @@ def generate_key():
     cur.close()
     conn.close()
     
-    log_action("KEY_GENERATE", f"Key: {key_code}", True, 0x00FFFF)
+    log_action("KEY_GENERATE", f"Generated: {key_code} ({duration})", True, 0x00FF00)
     return jsonify({"success": True})
 
-# --- HWID SIFIRLAMA ---
+# --- HWID SIFIRLAMA (RESET) ---
 @app.route('/api/reset_hwid', methods=['POST'])
 @login_required
 def reset_hwid():
     data = request.json
     key = data.get('key')
+    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("UPDATE keys SET hwid = NULL WHERE key_code = %s", (key,))
     conn.commit()
     cur.close()
     conn.close()
-    log_action("HWID_RESET", f"Reset for: {key}", True, 0xFFA500)
+    
+    log_action("HWID_RESET", f"HWID Reset for: {key}", True, 0xFFA500)
     return jsonify({"success": True})
 
 # --- KULLANICI BANLAMA ---
@@ -330,13 +367,15 @@ def reset_hwid():
 def ban_user():
     data = request.json
     key = data.get('key')
+    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("UPDATE keys SET status = 'banned' WHERE key_code = %s", (key,))
     conn.commit()
     cur.close()
     conn.close()
-    log_action("USER_BANNED", f"Banned: {key}", True, 0xFF0000)
+    
+    log_action("USER_BANNED", f"Banned User: {key}", True, 0xFF0000)
     return jsonify({"success": True})
 
 # --- KULLANICI SİLME ---
@@ -345,16 +384,18 @@ def ban_user():
 def delete_user():
     data = request.json
     key = data.get('key')
+    
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("DELETE FROM keys WHERE key_code = %s", (key,))
     conn.commit()
     cur.close()
     conn.close()
-    log_action("USER_DELETED", f"Deleted: {key}")
+    
+    log_action("USER_DELETED", f"Deleted User: {key}", False)
     return jsonify({"success": True})
 
-# --- MAPPING İŞLEMLERİ ---
+# --- MAPPING (OYUN-SCRIPT) EKLEME ---
 @app.route('/api/add_mapping', methods=['POST'])
 @login_required
 def add_mapping():
@@ -380,18 +421,21 @@ def delete_mapping():
     conn.close()
     return jsonify({"success": True})
 
-# --- PANIC MODE ---
+# --- PANIC MODE (SİSTEMİ KİLİTLE) ---
 @app.route('/api/panic_toggle', methods=['POST'])
 @login_required
 def panic_toggle():
     global IS_LOCKDOWN
     data = request.json
-    if 'state' in data: IS_LOCKDOWN = data['state']
-    else: IS_LOCKDOWN = not IS_LOCKDOWN
+    if 'state' in data: 
+        IS_LOCKDOWN = data['state']
+    else: 
+        IS_LOCKDOWN = not IS_LOCKDOWN
+    
     log_action("PANIC_MODE", f"System Lockdown: {IS_LOCKDOWN}", True, 0xFF0000)
     return jsonify({"success": True, "state": IS_LOCKDOWN})
 
-# --- HEARTBEAT ---
+# --- HEARTBEAT (CANLILIK KONTROLÜ) ---
 @app.route('/api/heartbeat')
 def heartbeat():
     return jsonify({"status": "alive", "online": True})
