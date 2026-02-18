@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZBH SYSTEM | Secure Access</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Courier+Prime:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-red: #ff003c;
+            --bg-dark: #050505;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            /* Hareketli Grid Arka Plan */
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* Ana Kart */
+        .access-card {
+            width: 400px;
+            background: rgba(10, 10, 10, 0.9);
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            opacity: 0;
+            animation: cardEntrance 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        
+        /* Kartın Tepesindeki Neon Çizgi */
+        .access-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px;
+            background: linear-gradient(90deg, var(--neon-blue), transparent);
+            border-radius: 16px 16px 0 0;
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+
+        @keyframes cardEntrance { to { transform: scale(1); opacity: 1; } }
+
+        .brand {
+            font-size: 32px; font-weight: 800; color: #fff; letter-spacing: 4px;
+            margin-bottom: 10px; text-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        .status-badge {
+            background: rgba(0, 243, 255, 0.1); color: var(--neon-blue);
+            border: 1px solid rgba(0, 243, 255, 0.3); padding: 5px 15px;
+            border-radius: 20px; font-size: 12px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 8px; margin-bottom: 30px;
+        }
+        .status-dot { width: 8px; height: 8px; background: var(--neon-blue); border-radius: 50%; box-shadow: 0 0 10px var(--neon-blue); animation: blink 2s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* Yükleme Ekranı (Loader) */
+        .loader-container { display: none; flex-direction: column; align-items: center; margin: 30px 0; }
+        .cyber-loader {
+            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--neon-blue); border-radius: 50%;
+            animation: spin 1s linear infinite; margin-bottom: 15px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Key Kutusu */
+        .key-container { display: none; margin: 30px 0; }
+        .key-box {
+            background: #000; border: 1px dashed #444; padding: 20px;
+            font-family: 'Courier Prime', monospace; font-size: 22px; color: var(--neon-blue);
+            letter-spacing: 2px; border-radius: 8px; position: relative;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+
+        /* Kopyala Butonu */
+        .btn-copy {
+            background: #fff; color: #000; border: none; padding: 15px; width: 100%;
+            font-family: 'Rajdhani', sans-serif; font-weight: 800; font-size: 18px;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
+            border-radius: 6px; transition: 0.3s; margin-top: 10px;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn-copy:hover {
+            background: var(--neon-blue); box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+        }
+
+        .footer-info {
+            margin-top: 25px; color: #555; font-size: 12px;
+            border-top: 1px solid #222; padding-top: 15px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="access-card">
+        <div class="brand">ZBH SYSTEM</div>
+        
+        <div class="status-badge" id="statusBadge">
+            <div class="status-dot"></div> <span id="statusText">CONNECTING TO SECURE NODE...</span>
+        </div>
+
+        <div class="loader-container" id="loader">
+            <div class="cyber-loader"></div>
+            <div style="color: #888; font-size: 14px; letter-spacing: 1px;">ENCRYPTING DAILY KEY...</div>
+        </div>
+
+        <div class="key-container" id="keyDisplay">
+            <div style="color: #fff; font-size: 14px; margin-bottom: 10px; opacity: 0.7;">YOUR UNIQUE ACCESS TOKEN</div>
+            <div class="key-box" id="keyVal">LOADING...</div>
+            
+            <button class="btn-copy" onclick="copyKey()">
+                <i class="far fa-copy"></i> COPY KEY
+            </button>
+        </div>
+
+        <div class="footer-info">
+            <i class="fas fa-shield-alt"></i> IP LOCKED &middot; EXPIRES IN 24H &middot; ONE-TIME USE
+        </div>
+    </div>
+
+    <script>
+        // Sayfa açılınca senaryoyu başlat
+        window.onload = function() {
+            const statusText = document.getElementById('statusText');
+            const loader = document.getElementById('loader');
+            const keyDisplay = document.getElementById('keyDisplay');
+            const badge = document.getElementById('statusBadge');
+
+            // 1. Adım: Bağlanıyor...
+            loader.style.display = 'flex';
+            
+            setTimeout(() => {
+                statusText.innerText = "VERIFYING IP ADDRESS...";
+            }, 1000);
+
+            setTimeout(() => {
+                statusText.innerText = "GENERATING HASH...";
+            }, 2000);
+
+            // 2. Adım: Key'i Çek ve Göster
+            fetch('/api/public_key', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        keyDisplay.style.display = 'block';
+                        document.getElementById('keyVal').innerText = data.key;
+                        
+                        statusText.innerText = "ACCESS GRANTED";
+                        badge.style.borderColor = "#00ff00";
+                        badge.style.color = "#00ff00";
+                        badge.querySelector('.status-dot').style.background = "#00ff00";
+                        badge.querySelector('.status-dot').style.boxShadow = "0 0 10px #00ff00";
+                    }, 800); // Biraz daha bekletip heyecan yaratalım
+                })
+                .catch(err => {
+                    statusText.innerText = "CONNECTION FAILED";
+                    statusText.style.color = "red";
+                });
+        };
+
+        function copyKey() {
+            const key = document.getElementById('keyVal').innerText;
+            navigator.clipboard.writeText(key).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                btn.style.background = "#00ff00";
+                btn.innerHTML = '<i class="fas fa-check"></i> COPIED!';
+                setTimeout(() => {
+                    btn.style.background = "#fff";
+                    btn.innerHTML = '<i class="far fa-copy"></i> COPY KEY';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

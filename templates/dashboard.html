@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}ZBH SYSTEM | Command Center{% endblock %}
+
+{% block head %}
+<style>
+    /* --- DASHBOARD ÖZEL TASARIM --- */
+
+    /* Üst Bilgi Barı */
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(20, 20, 20, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 25px;
+        border-radius: 12px;
+        margin-bottom: 40px;
+        backdrop-filter: blur(5px);
+    }
+
+    /* Durum Göstergesi (Yanıp Sönen Yeşil Işık) */
+    .system-status {
+        display: flex; align-items: center; gap: 15px;
+        background: rgba(0, 255, 0, 0.05);
+        padding: 8px 20px;
+        border-radius: 50px;
+        border: 1px solid rgba(0, 255, 0, 0.2);
+    }
+    .pulse-dot {
+        width: 10px; height: 10px; background: #00ff00; border-radius: 50%;
+        box-shadow: 0 0 15px #00ff00;
+        animation: pulse 2s infinite;
+    }
+    @keyframes pulse { 0% { opacity: 1; box-shadow: 0 0 0 #00ff00; } 50% { opacity: 0.5; box-shadow: 0 0 20px #00ff00; } 100% { opacity: 1; box-shadow: 0 0 0 #00ff00; } }
+
+    /* İstatistik Grid Yapısı */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 30px;
+    }
+
+    /* Özel Kart Tasarımı (Base.html'deki .card'ı eziyoruz/geliştiriyoruz) */
+    .stat-card {
+        background: linear-gradient(160deg, #151515 0%, #0a0a0a 100%);
+        padding: 35px;
+        border-radius: 16px;
+        border: 1px solid #222;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+
+    /* Kart Renk Varyasyonları */
+    .stat-card.cyan { border-bottom: 4px solid #00f3ff; }
+    .stat-card.cyan:hover { border-color: #00f3ff; box-shadow: 0 10px 30px rgba(0, 243, 255, 0.15); }
+    
+    .stat-card.green { border-bottom: 4px solid #00ff00; }
+    .stat-card.green:hover { border-color: #00ff00; box-shadow: 0 10px 30px rgba(0, 255, 0, 0.15); }
+    
+    .stat-card.gold { border-bottom: 4px solid #ffd700; }
+    .stat-card.gold:hover { border-color: #ffd700; box-shadow: 0 10px 30px rgba(255, 215, 0, 0.15); }
+    
+    .stat-card.red { border-bottom: 4px solid #ff003c; }
+    .stat-card.red:hover { border-color: #ff003c; box-shadow: 0 10px 30px rgba(255, 0, 60, 0.15); }
+
+    /* Kart İçi Elementler */
+    .stat-icon {
+        position: absolute;
+        top: 25px; right: 25px;
+        font-size: 50px;
+        opacity: 0.05;
+        transition: 0.4s;
+        color: #fff;
+    }
+    .stat-card:hover .stat-icon { opacity: 0.2; transform: scale(1.2) rotate(10deg); }
+
+    .stat-value {
+        font-size: 54px;
+        font-weight: 800;
+        color: #fff;
+        margin: 15px 0 5px 0;
+        text-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: #666;
+        font-weight: 700;
+    }
+    
+    .stat-sub {
+        font-size: 11px;
+        color: #444;
+        margin-top: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-header">
+    <div>
+        <h2 style="margin: 0; color: white; font-size: 26px; letter-spacing: 1px;">COMMAND CENTER</h2>
+        <div style="color: #666; font-size: 12px; letter-spacing: 2px; margin-top: 6px;">
+            <i class="fas fa-satellite-dish"></i> PROTOCOL: GHOST // SECURITY: MAX
+        </div>
+    </div>
+    <div id="statusBadge" class="system-status">
+        <div id="statusDot" class="pulse-dot"></div>
+        <div id="statusText" style="font-weight: 700; font-size: 13px; color: #fff; letter-spacing: 1px;">Checking...</div>
+    </div>
+</div>
+
+<div class="stats-grid">
+    
+    <div class="stat-card cyan">
+        <i class="fas fa-database stat-icon"></i>
+        <div class="stat-label">Total Database</div>
+        <div class="stat-value">{{ total }}</div>
+        <div class="stat-sub">Registered Licenses</div>
+    </div>
+
+    <div class="stat-card green">
+        <i class="fas fa-user-check stat-icon"></i>
+        <div class="stat-label">Active Users</div>
+        <div class="stat-value" style="color: #00ff00;">{{ active }}</div>
+        <div class="stat-sub">Online & Valid</div>
+    </div>
+
+    <div class="stat-card gold">
+        <i class="fas fa-crown stat-icon"></i>
+        <div class="stat-label">VIP Members</div>
+        <div class="stat-value" style="color: #ffd700;">{{ vip }}</div>
+        <div class="stat-sub">Elite Access Group</div>
+    </div>
+
+    <div class="stat-card red">
+        <i class="fas fa-skull stat-icon"></i>
+        <div class="stat-label">Terminated</div>
+        <div class="stat-value" style="color: #ff003c;">{{ banned }}</div>
+        <div class="stat-sub">Banned / Expired</div>
+    </div>
+
+</div>
+
+<div style="margin-top: 40px; display: grid; grid-template-columns: 2fr 1fr; gap: 30px;">
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header"><i class="fas fa-terminal" style="color: #00f3ff;"></i> RECENT SYSTEM ACTIVITY</div>
+        <div style="font-family: monospace; color: #666; font-size: 13px; line-height: 2;">
+            <div>> System integrity check completed... <span style="color: #00ff00;">[OK]</span></div>
+            <div>> Encryption keys rotated... <span style="color: #00ff00;">[OK]</span></div>
+            <div>> Connecting to secure nodes... <span style="color: #00ff00;">[CONNECTED]</span></div>
+            <div>> Waiting for incoming client requests...</div>
+        </div>
+    </div>
+    
+    <div class="card" style="margin-bottom: 0; text-align: center; display: flex; flex-direction: column; justify-content: center;">
+        <i class="fas fa-server" style="font-size: 40px; color: #333; margin-bottom: 20px;"></i>
+        <div style="font-size: 24px; font-weight: 800; color: white;">NODE: ALPHA</div>
+        <div style="color: #555; font-size: 12px; margin-top: 5px;">UPTIME: 99.9%</div>
+    </div>
+</div>
+
+{% endblock %}

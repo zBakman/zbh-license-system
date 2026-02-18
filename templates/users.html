@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}ZBH SYSTEM | License Authority{% endblock %}
+
+{% block head %}
+<style>
+    /* --- ULTRA-PREMIUM STYLES (350+ PUAN) --- */
+
+    /* 1. Üst Kontrol Paneli (Glassmorphism + Neon) */
+    .control-panel {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(90deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.4) 100%);
+        padding: 25px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 30px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Panel Altına Neon Çizgi */
+    .control-panel::after {
+        content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
+        background: linear-gradient(90deg, transparent, var(--neon-red), transparent);
+        opacity: 0.7;
+    }
+
+    /* 2. Cyber Search Bar (Animasyonlu) */
+    .search-wrapper { position: relative; width: 350px; }
+    
+    .search-wrapper input {
+        width: 100%;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid #333;
+        padding: 15px 15px 15px 50px;
+        color: var(--neon-blue);
+        border-radius: 50px;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 16px;
+        transition: all 0.4s ease;
+        letter-spacing: 1px;
+    }
+    
+    .search-wrapper input:focus {
+        background: rgba(0, 0, 0, 0.6);
+        border-color: var(--neon-blue);
+        box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+        width: 105%; /* Hafif büyüme efekti */
+        transform: translateX(-2.5%);
+    }
+
+    .search-wrapper i {
+        position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+        color: #666; transition: 0.3s;
+    }
+    .search-wrapper input:focus + i { color: var(--neon-blue); }
+
+    /* 3. Tablo (High-End Görünüm) */
+    .user-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
+    
+    .user-table th {
+        color: #555; font-size: 11px; font-weight: 800; letter-spacing: 2px;
+        padding: 0 20px 10px 20px; text-align: left;
+    }
+
+    .user-table tbody tr {
+        background: linear-gradient(145deg, #121212, #0e0e0e);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .user-table tbody tr td {
+        padding: 20px;
+        border-top: 1px solid #1a1a1a;
+        border-bottom: 1px solid #1a1a1a;
+    }
+    .user-table tbody tr td:first-child { border-left: 1px solid #1a1a1a; border-radius: 10px 0 0 10px; }
+    .user-table tbody tr td:last-child { border-right: 1px solid #1a1a1a; border-radius: 0 10px 10px 0; }
+
+    /* Hover Efekti (Neon Glow) */
+    .user-table tbody tr:hover {
+        transform: scale(1.01) translateY(-2px);
+        background: #181818;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        z-index: 10;
+    }
+    .user-table tbody tr:hover td:first-child { border-left: 3px solid var(--neon-red); }
+
+    /* 4. Rozetler (Pulsing) */
+    .badge {
+        padding: 6px 15px; border-radius: 30px; font-size: 10px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 1.5px; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+    
+    .badge.active { background: rgba(0, 255, 0, 0.08); color: #00ff00; border: 1px solid rgba(0, 255, 0, 0.2); }
+    .badge.active .badge-dot { background: #00ff00; box-shadow: 0 0 8px #00ff00; animation: pulse-green 2s infinite; }
+    
+    .badge.banned { background: rgba(255, 0, 60, 0.08); color: #ff003c; border: 1px solid rgba(255, 0, 60, 0.2); }
+    .badge.banned .badge-dot { background: #ff003c; box-shadow: 0 0 8px #ff003c; }
+
+    @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+    /* 5. Butonlar (Ghost & Neon) */
+    .btn-icon {
+        width: 38px; height: 38px; border-radius: 10px;
+        background: rgba(255,255,255,0.03); color: #666; border: 1px solid transparent;
+        cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-icon:hover { transform: translateY(-3px); }
+    .btn-icon.copy:hover { background: rgba(0, 243, 255, 0.1); color: var(--neon-blue); border-color: var(--neon-blue); }
+    .btn-icon.ban:hover { background: rgba(255, 0, 60, 0.1); color: var(--neon-red); border-color: var(--neon-red); }
+    .btn-icon.del:hover { background: #fff; color: #000; border-color: #fff; }
+
+    /* 6. Modal Animasyon */
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-50px) scale(0.9); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .modal-content { animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="control-panel">
+    <div>
+        <h2 style="margin: 0; color: white; font-size: 26px; letter-spacing: 1px; text-shadow: 0 0 20px rgba(255,255,255,0.1);">LICENSE DATABASE</h2>
+        <div style="color: #666; font-size: 12px; margin-top: 5px; font-family: monospace;">
+            ENCRYPTED RECORDS: <span style="color: var(--neon-blue);">{{ keys|length }}</span> // SYSTEM: SECURE
+        </div>
+    </div>
+
+    <div style="display: flex; gap: 25px; align-items: center;">
+        <div class="search-wrapper">
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="SEARCH KEY / HWID / TAG...">
+            <i class="fas fa-search"></i>
+        </div>
+        
+        <button class="btn-action" onclick="openModal()" style="box-shadow: 0 0 15px rgba(255, 0, 60, 0.3);">
+            <i class="fas fa-plus-hexagon"></i> GENERATE
+        </button>
+    </div>
+</div>
+
+<table class="user-table" id="licenseTable">
+    <thead>
+        <tr>
+            <th>LICENSE KEY</th>
+            <th>STATUS</th>
+            <th>ACCESS LEVEL</th>
+            <th>HARDWARE ID</th>
+            <th>EXPIRATION</th>
+            <th style="text-align: right;">CONTROLS</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for key in keys %}
+        <tr>
+            <td>
+                <div style="font-family: 'Courier New', monospace; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; font-size: 15px;">
+                    {% if key.type == 'VIP' %} 
+                        <i class="fas fa-crown" style="color: #ffd700; filter: drop-shadow(0 0 5px #ffd700);"></i> 
+                    {% else %}
+                        <i class="fas fa-key" style="color: #444;"></i>
+                    {% endif %}
+                    <span id="key-text-{{ loop.index }}" style="letter-spacing: 1px;">{{ key.key_code }}</span>
+                </div>
+            </td>
+            
+            <td>
+                <div class="badge {{ 'active' if key.status == 'active' else 'banned' }}">
+                    <div class="badge-dot"></div>
+                    {{ key.status }}
+                </div>
+            </td>
+            
+            <td>
+    {% if key['type'] == 'VIP' %}
+        <div style="color: #ffd700; font-weight: 700; letter-spacing: 1px; font-size: 12px;">
+            <i class="fas fa-crown" style="margin-right: 5px;"></i> VIP
+        </div>
+    {% else %}
+        <div style="color: #888; font-weight: 700; letter-spacing: 1px; font-size: 12px;">
+            <i class="fas fa-user" style="margin-right: 5px;"></i> STANDARD
+        </div>
+    {% endif %}
+</td>
+            
+            <td style="font-family: monospace; color: #555; font-size: 13px;">
+                {% if key.hwid %}
+                    {{ key.hwid[:20] }}<span style="opacity:0.3">...</span>
+                {% else %}
+                    <span style="opacity: 0.2; font-style: italic;">-- NO CONNECTION --</span>
+                {% endif %}
+            </td>
+            
+            <td style="color: #777; font-size: 13px; font-weight: 600;">
+                {{ key.expires_at[:16] }}
+            </td>
+            
+            <td>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn-icon copy" onclick="copyToClipboard('key-text-{{ loop.index }}')" title="Copy Key">
+                        <i class="far fa-copy"></i>
+                    </button>
+                    <button class="btn-icon ban" onclick="banUser('{{ key.key_code }}')" title="Ban User">
+                        <i class="fas fa-ban"></i>
+                    </button>
+                    <button class="btn-icon del" onclick="deleteUser('{{ key.key_code }}')" title="Delete Record">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" style="text-align: center; padding: 60px; color: #444; background: transparent; box-shadow: none;">
+                <i class="fas fa-folder-open" style="font-size: 40px; margin-bottom: 20px; opacity: 0.5;"></i><br>
+                DATABASE IS EMPTY
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div id="keyModal" class="modal">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 20px;">
+            <div style="font-size: 22px; font-weight: 800; color: white; letter-spacing: 1px;">
+                <span style="color: var(--neon-red);">//</span> GENERATE LICENSE
+            </div>
+            <i class="fas fa-times" onclick="closeModal()" style="cursor: pointer; color: #666; transition: 0.3s;"></i>
+        </div>
+        
+        <div style="text-align: left; margin-bottom: 20px;">
+            <label style="color: var(--neon-blue);">ACCESS DURATION</label>
+            <select id="keyDuration" style="background: #0a0a0a; border-color: #333;">
+                <option value="1_day">1 Day (24 Hours)</option>
+                <option value="7_day">1 Week (7 Days)</option>
+                <option value="30_day">1 Month (30 Days)</option>
+                <option value="lifetime" style="color: #ffd700; font-weight: bold;">∞ LIFETIME ACCESS</option>
+            </select>
+        </div>
+
+        <div style="margin-bottom: 30px; background: rgba(255, 215, 0, 0.03); border: 1px solid rgba(255, 215, 0, 0.1); padding: 20px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="color: #ffd700; font-weight: 800; letter-spacing: 1px;">VIP PRIVILEGES</div>
+                <div style="color: #666; font-size: 11px; margin-top: 3px;">Access to 'High-Risk' scripts.</div>
+            </div>
+            
+            <label class="switch" style="position: relative; display: inline-block; width: 46px; height: 24px;">
+                <input type="checkbox" id="isVip" style="opacity: 0; width: 0; height: 0;">
+                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #222; transition: .4s; border-radius: 34px; border: 1px solid #444;"></span>
+                <span class="slider-dot" style="position: absolute; content: ''; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #888; transition: .4s; border-radius: 50%;"></span>
+            </label>
+            <style>
+                #isVip:checked + span { background-color: rgba(255, 215, 0, 0.2); border-color: #ffd700; }
+                #isVip:checked + span + .slider-dot { transform: translateX(22px); background-color: #ffd700; box-shadow: 0 0 10px #ffd700; }
+            </style>
+        </div>
+
+        <button class="btn-action" style="width: 100%; justify-content: center; padding: 15px;" onclick="generateKey()">
+            INITIATE GENERATION
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // FİLTRELEME
+    function filterTable() {
+        var input = document.getElementById("searchInput");
+        var filter = input.value.toUpperCase();
+        var table = document.getElementById("licenseTable");
+        var tr = table.getElementsByTagName("tr");
+
+        for (i = 0; i < tr.length; i++) {
+            var tdKey = tr[i].getElementsByTagName("td")[0];
+            var tdHwid = tr[i].getElementsByTagName("td")[3];
+            var tdStatus = tr[i].getElementsByTagName("td")[1];
+            
+            if (tdKey || tdHwid) {
+                var txtKey = tdKey.textContent || tdKey.innerText;
+                var txtHwid = tdHwid.textContent || tdHwid.innerText;
+                var txtStatus = tdStatus.textContent || tdStatus.innerText;
+                
+                if (txtKey.toUpperCase().indexOf(filter) > -1 || 
+                    txtHwid.toUpperCase().indexOf(filter) > -1 ||
+                    txtStatus.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+    }
+
+    // KOPYALAMA
+    function copyToClipboard(elementId) {
+        var text = document.getElementById(elementId).innerText;
+        navigator.clipboard.writeText(text).then(function() {
+            // Basit bir görsel geri bildirim (Button rengini değiştir)
+            var btn = event.currentTarget;
+            var originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check" style="color:#00ff00;"></i>';
+            setTimeout(() => { btn.innerHTML = originalHtml; }, 1000);
+        });
+    }
+
+    // MODAL
+    function openModal() { document.getElementById('keyModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('keyModal').style.display = 'none'; }
+    
+    // API
+    async function generateKey() {
+        const duration = document.getElementById('keyDuration').value;
+        const isVip = document.getElementById('isVip').checked;
+        const btn = document.querySelector('#keyModal .btn-action');
+        
+        btn.innerHTML = '<i class="fas fa-cog fa-spin"></i> PROCESSING...';
+        
+        try {
+            const res = await fetch('/api/generate_key', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ duration: duration, is_vip: isVip })
+            });
+            const result = await res.json();
+            if (result.success) location.reload();
+        } catch (e) {
+            alert("System Error");
+            btn.innerText = "TRY AGAIN";
+        }
+    }
+
+    async function banUser(key) {
+        if(confirm('CONFIRM: Terminate User Access?')) {
+            const res = await fetch('/api/ban_user', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ key: key }) });
+            if ((await res.json()).success) location.reload();
+        }
+    }
+
+    async function deleteUser(key) {
+        if(confirm('CONFIRM: Wipe User Data?')) {
+            const res = await fetch('/api/delete_user', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ key: key }) });
+            if ((await res.json()).success) location.reload();
+        }
+    }
+</script>
+{% endblock %}

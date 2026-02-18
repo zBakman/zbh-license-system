@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}ZBH SYSTEM | Script Arsenal{% endblock %}
+
+{% block head %}
+<style>
+    /* --- MAPPING ÖZEL STİLLER (ELITE QUALITY) --- */
+
+    /* 1. Kontrol Paneli */
+    .control-panel {
+        display: flex; justify-content: space-between; align-items: center;
+        background: linear-gradient(90deg, rgba(20, 20, 20, 0.9) 0%, rgba(10, 10, 10, 0.5) 100%);
+        padding: 25px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 30px; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        position: relative; overflow: hidden;
+    }
+    .control-panel::after {
+        content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
+        background: linear-gradient(90deg, transparent, var(--neon-blue), transparent); opacity: 0.7;
+    }
+
+    /* 2. Tablo Tasarımı */
+    .map-table { width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+    
+    .map-table th {
+        color: #666; font-size: 11px; font-weight: 800; letter-spacing: 2px;
+        padding: 0 20px 10px 20px; text-align: left; text-transform: uppercase;
+    }
+
+    .map-table tbody tr {
+        background: linear-gradient(145deg, #121212, #0e0e0e);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+    }
+
+    .map-table tbody tr td { padding: 20px; border-top: 1px solid #1a1a1a; border-bottom: 1px solid #1a1a1a; }
+    .map-table tbody tr td:first-child { border-left: 1px solid #1a1a1a; border-radius: 10px 0 0 10px; }
+    .map-table tbody tr td:last-child { border-right: 1px solid #1a1a1a; border-radius: 0 10px 10px 0; }
+
+    /* Hover Efekti (Neon Mavi) */
+    .map-table tbody tr:hover {
+        transform: scale(1.005) translateY(-2px); background: #181818;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 10;
+    }
+    .map-table tbody tr:hover td:first-child { border-left: 3px solid var(--neon-blue); }
+
+    /* 3. Link ve ID Kutuları */
+    .code-box {
+        background: rgba(0,0,0,0.3); padding: 5px 10px; border-radius: 4px;
+        font-family: 'Courier New', monospace; font-size: 13px; color: #aaa;
+        border: 1px solid #222; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .code-box i { color: #555; }
+
+    /* 4. Butonlar */
+    .btn-icon {
+        width: 35px; height: 35px; border-radius: 8px;
+        background: rgba(255,255,255,0.03); color: #666; border: 1px solid transparent;
+        cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-icon:hover { transform: translateY(-3px); color: white; background: #222; }
+    .btn-icon.del:hover { color: var(--neon-red); border-color: var(--neon-red); background: rgba(255, 0, 60, 0.1); }
+    .btn-icon.edit:hover { color: var(--neon-gold); border-color: var(--neon-gold); background: rgba(255, 215, 0, 0.1); }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="control-panel">
+    <div>
+        <h2 style="margin: 0; color: white; font-size: 24px; letter-spacing: 1px;">SCRIPT ARSENAL</h2>
+        <div style="color: #666; font-size: 12px; margin-top: 5px; font-family: monospace;">
+            ACTIVE MAPPINGS: <span style="color: var(--neon-blue);">{{ mappings|length }}</span> // DEPLOYMENT READY
+        </div>
+    </div>
+
+    <button class="btn-action" onclick="openMapModal()" style="box-shadow: 0 0 15px rgba(0, 243, 255, 0.3); background: var(--neon-blue); color: #000;">
+        <i class="fas fa-plus-square"></i> ADD NEW MAP
+    </button>
+</div>
+
+<table class="map-table">
+    <thead>
+        <tr>
+            <th>GAME NAME</th>
+            <th>PLACE ID (ROBLOX)</th>
+            <th>SCRIPT SOURCE (GITHUB/RAW)</th>
+            <th>STATUS</th>
+            <th style="text-align: right;">CONTROLS</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for map in mappings %}
+        <tr>
+            <td>
+                <div style="font-weight: 700; color: white; font-size: 15px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-gamepad" style="color: var(--neon-blue);"></i>
+                    {{ map['game_name'] }}
+                </div>
+            </td>
+            
+           <td>
+                <div class="code-box" title="Click to Copy" onclick="copyText('{{ map.place_id }}')" style="cursor: pointer;">
+                    <i class="fas fa-fingerprint"></i> {{ map.place_id }}
+                </div>
+            </td>
+            <td>
+                <div class="code-box" style="max-width: 250px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #666;">
+                    <i class="fab fa-github"></i> 
+                    <a href="{{ map['script_url'] }}" target="_blank" style="color: #888; text-decoration: none; transition: 0.3s;">
+                        {{ map['script_url'] }}
+                    </a>
+                </div>
+            </td>
+
+            <td>
+                <div style="font-size: 11px; font-weight: 800; color: #00ff00; display: flex; align-items: center; gap: 5px;">
+                    <div style="width: 6px; height: 6px; background: #00ff00; border-radius: 50%; box-shadow: 0 0 5px #00ff00;"></div>
+                    DEPLOYED
+                </div>
+            </td>
+
+            <td>
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button class="btn-icon edit" onclick="editMap('{{ map.id }}')" title="Edit Mapping">
+                         <i class="fas fa-pen"></i>
+                    </button>
+                <button class="btn-icon del" onclick="deleteMap('{{ map.id }}')" title="Delete Mapping">
+                        <i class="fas fa-trash"></i>
+                </button>
+                        </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="5" style="text-align: center; padding: 60px; color: #444;">
+                <i class="fas fa-map-marked-alt" style="font-size: 40px; margin-bottom: 20px; opacity: 0.5;"></i><br>
+                NO SCRIPT MAPPINGS FOUND. SYSTEM IDLE.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<div id="mapModal" class="modal">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 20px;">
+            <div style="font-size: 20px; font-weight: 800; color: white;">
+                <span style="color: var(--neon-blue);">//</span> DEPLOY NEW SCRIPT
+            </div>
+            <i class="fas fa-times" onclick="closeMapModal()" style="cursor: pointer; color: #666; transition: 0.3s;"></i>
+        </div>
+
+        <div style="text-align: left;">
+            <label>Target Game Name</label>
+            <input type="text" id="gameName" placeholder="e.g. Blox Fruits, Pet Sim 99...">
+            
+            <label>Roblox Place ID (Numeric)</label>
+            <input type="text" id="placeId" placeholder="e.g. 2753915549">
+            
+            <label>Script Source URL (Raw)</label>
+            <input type="text" id="scriptUrl" placeholder="https://raw.githubusercontent.com/user/repo/main/script.lua">
+        </div>
+
+        <button class="btn-action" style="width: 100%; margin-top: 25px; background: var(--neon-blue); color: #000;" onclick="saveMapping()">
+            CONFIRM DEPLOYMENT
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openMapModal() { document.getElementById('mapModal').style.display = 'flex'; }
+    function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
+    
+    function copyText(text) {
+        navigator.clipboard.writeText(text);
+        alert("COPIED: " + text);
+    }
+
+    async function saveMapping() {
+        const gameName = document.getElementById('gameName').value;
+        const placeId = document.getElementById('placeId').value;
+        const scriptUrl = document.getElementById('scriptUrl').value;
+        
+        const btn = document.querySelector('#mapModal .btn-action');
+        btn.innerText = "DEPLOYING...";
+
+        const res = await fetch('/api/add_mapping', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ game_name: gameName, place_id: placeId, script_url: scriptUrl })
+        });
+
+        if ((await res.json()).success) {
+            location.reload();
+        } else {
+            alert("Error saving mapping.");
+            btn.innerText = "CONFIRM DEPLOYMENT";
+        }
+    }
+
+    async function deleteMap(id) {
+        if(confirm('CONFIRM: Remove this script mapping?')) {
+            const res = await fetch('/api/delete_mapping', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id }) });
+            if ((await res.json()).success) location.reload();
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}ZBH SYSTEM | Configuration{% endblock %}
+
+{% block head %}
+<style>
+    /* --- SETTINGS ÖZEL TASARIM (350+ PUAN) --- */
+
+    /* Kart Başlıkları */
+    .section-title {
+        font-size: 14px; font-weight: 800; color: #666; letter-spacing: 2px;
+        margin-bottom: 15px; text-transform: uppercase; border-left: 3px solid var(--neon-blue);
+        padding-left: 10px;
+    }
+
+    /* 1. DUYURU KARTI */
+    .broadcast-card {
+        background: linear-gradient(145deg, #101010, #080808);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 25px; border-radius: 12px; margin-bottom: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .broadcast-input {
+        width: 100%; background: #050505; border: 1px solid #222; color: var(--neon-green);
+        padding: 15px; font-family: 'Courier New', monospace; font-size: 14px;
+        border-radius: 6px; resize: vertical; min-height: 80px; transition: 0.3s;
+    }
+    .broadcast-input:focus {
+        border-color: var(--neon-green); box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
+        background: #000;
+    }
+
+    /* 2. GÜVENLİK KARTI (TOGGLE SWITCHLER) */
+    .security-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 20px 0; border-bottom: 1px solid #1a1a1a;
+    }
+    .security-row:last-child { border-bottom: none; }
+
+    /* Neon Toggle Switch */
+    .cyber-switch {
+        position: relative; display: inline-block; width: 50px; height: 26px;
+    }
+    .cyber-switch input { opacity: 0; width: 0; height: 0; }
+    
+    .slider {
+        position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #111; transition: .4s; border-radius: 34px; border: 1px solid #333;
+    }
+    .slider:before {
+        position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+        background-color: #666; transition: .4s; border-radius: 50%;
+    }
+    
+    input:checked + .slider { background-color: rgba(0, 243, 255, 0.1); border-color: var(--neon-blue); }
+    input:checked + .slider:before { transform: translateX(24px); background-color: var(--neon-blue); box-shadow: 0 0 10px var(--neon-blue); }
+
+    /* 3. PANIC ZONE (NÜKLEER BUTON) */
+    .danger-zone {
+        border: 1px solid rgba(255, 0, 60, 0.2); background: rgba(255, 0, 60, 0.02);
+        padding: 30px; border-radius: 12px; margin-top: 20px; text-align: center;
+    }
+    
+    .nuclear-btn {
+        background: #111; color: #555; border: 2px solid #333;
+        padding: 20px 40px; font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 4px; cursor: pointer; transition: all 0.4s;
+        width: 100%; border-radius: 6px; position: relative; overflow: hidden;
+    }
+    
+    .nuclear-btn:hover {
+        border-color: var(--neon-red); color: var(--neon-red);
+        box-shadow: 0 0 20px rgba(255, 0, 60, 0.2);
+    }
+
+    /* Panik Aktif Efekti */
+    .nuclear-btn.active {
+        background: var(--neon-red); color: white; border-color: var(--neon-red);
+        box-shadow: 0 0 50px rgba(255, 0, 60, 0.6);
+        animation: pulse-panic 0.8s infinite alternate;
+    }
+    
+    .nuclear-btn.active::before {
+        content: "⚠️ LOCKDOWN ACTIVE ⚠️";
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+        background: var(--neon-red); display: flex; align-items: center; justify-content: center;
+    }
+
+    @keyframes pulse-panic {
+        0% { transform: scale(1); box-shadow: 0 0 30px rgba(255, 0, 60, 0.5); }
+        100% { transform: scale(1.02); box-shadow: 0 0 60px rgba(255, 0, 60, 0.9); }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="max-width: 900px; margin: 0 auto;">
+    
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px;">
+        <h2 style="margin: 0; color: white; font-size: 28px; letter-spacing: 1px;">SYSTEM CONFIGURATION</h2>
+        <div style="color: #666; font-family: monospace;">NODE_ID: ALPHA_01</div>
+    </div>
+
+    <div class="section-title">BROADCAST SYSTEM</div>
+    <div class="broadcast-card">
+        <div style="margin-bottom: 15px; color: #ccc; font-size: 14px;">
+            <i class="fas fa-bullhorn" style="color: var(--neon-green); margin-right: 10px;"></i>
+            Global Message (Visible to all clients)
+        </div>
+        <textarea class="broadcast-input" placeholder="> TYPE SYSTEM MESSAGE HERE..."></textarea>
+        <div style="text-align: right; margin-top: 15px;">
+            <button class="btn-action" style="background: var(--neon-green); color: #000;">
+                <i class="fas fa-paper-plane"></i> SEND BROADCAST
+            </button>
+        </div>
+    </div>
+
+    <div class="section-title" style="border-color: var(--neon-blue);">SECURITY PROTOCOLS</div>
+    <div class="card" style="padding: 0 25px;">
+        
+        <div class="security-row">
+            <div>
+                <div style="color: white; font-weight: 700; font-size: 16px;">HWID Enforcement</div>
+                <div style="color: #666; font-size: 13px; margin-top: 5px;">Block logins from unknown devices automatically.</div>
+            </div>
+            <label class="cyber-switch">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="security-row">
+            <div>
+                <div style="color: white; font-weight: 700; font-size: 16px;">Anti-Proxy / VPN</div>
+                <div style="color: #666; font-size: 13px; margin-top: 5px;">Flag suspicious IP addresses.</div>
+            </div>
+            <label class="cyber-switch">
+                <input type="checkbox">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+    </div>
+
+    <div class="section-title" style="border-color: var(--neon-red); color: var(--neon-red);">DANGER ZONE</div>
+    <div class="danger-zone">
+        <div style="color: #ff003c; font-weight: 800; font-size: 18px; margin-bottom: 10px;">EMERGENCY LOCKDOWN</div>
+        <div style="color: #888; font-size: 13px; margin-bottom: 25px; max-width: 600px; margin-left: auto; margin-right: auto;">
+            Initiating lockdown will immediately reject ALL incoming connections, drop active sessions, and switch the API to "Silent Mode". Only Admin access will remain.
+        </div>
+        
+        <button id="nuclearBtn" class="nuclear-btn" onclick="toggleLockdown()">
+            <i class="fas fa-radiation-alt" style="margin-right: 10px;"></i> INITIATE LOCKDOWN
+        </button>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let isLockdown = false;
+
+    function toggleLockdown() {
+        const btn = document.getElementById('nuclearBtn');
+        isLockdown = !isLockdown;
+
+        if (isLockdown) {
+            // Panik Aktif
+            btn.classList.add('active');
+            // İleride buraya fetch('/api/panic_on') gelecek
+        } else {
+            // Panik Kapalı
+            btn.classList.remove('active');
+            btn.innerHTML = '<i class="fas fa-radiation-alt" style="margin-right: 10px;"></i> INITIATE LOCKDOWN';
+            // İleride buraya fetch('/api/panic_off') gelecek
+        }
+    }
+</script>
+{% endblock %}

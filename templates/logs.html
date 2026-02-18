@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Sistem Kayıtları (Logs){% endblock %}
+
+{% block content %}
+<table>
+    <thead>
+        <tr>
+            <th width="15%">Zaman</th>
+            <th width="10%">Tür</th>
+            <th>Olay Mesajı</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td style="color: #8b949e; font-family: monospace;">{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>
+                {% if log.type == 'SUCCESS' %}<span style="color:#3fb950; font-weight:bold; font-size:12px;">BAŞARILI</span>{% endif %}
+                {% if log.type == 'ERROR' %}<span style="color:#da3633; font-weight:bold; font-size:12px;">HATA</span>{% endif %}
+                {% if log.type == 'SECURITY' %}<span style="color:#d29922; font-weight:bold; font-size:12px;">GÜVENLİK</span>{% endif %}
+                {% if log.type == 'INFO' %}<span style="color:#58a6ff; font-weight:bold; font-size:12px;">BİLGİ</span>{% endif %}
+                {% if log.type == 'WARNING' %}<span style="color:orange; font-weight:bold; font-size:12px;">UYARI</span>{% endif %}
+            </td>
+            <td style="color: #c9d1d9;">{{ log.message }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" style="text-align:center; padding:20px;">Henüz log kaydı yok.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

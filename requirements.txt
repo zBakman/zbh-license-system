@@ -1,0 +1,4 @@
+Plaintext
+Flask
+gunicorn
+python-dotenv

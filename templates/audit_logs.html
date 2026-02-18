@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}ZBH SYSTEM | Security Logs{% endblock %}
+
+{% block head %}
+<style>
+    /* --- AUDIT LOGS ÖZEL STİLLER (ELITE) --- */
+
+    /* 1. Üst Panel */
+    .control-panel {
+        display: flex; justify-content: space-between; align-items: center;
+        background: linear-gradient(90deg, rgba(20, 20, 20, 0.9) 0%, rgba(10, 10, 10, 0.5) 100%);
+        padding: 25px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);
+        margin-bottom: 30px; backdrop-filter: blur(10px); box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+
+    /* 2. Log Tablosu */
+    .log-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
+    
+    .log-table th {
+        color: #555; font-size: 11px; font-weight: 800; letter-spacing: 2px;
+        padding: 0 20px 10px 20px; text-align: left; text-transform: uppercase;
+    }
+
+    .log-table tbody tr {
+        background: #111; transition: 0.3s;
+        border-left: 2px solid transparent;
+    }
+    
+    .log-table tbody tr:hover {
+        background: #161616; transform: translateX(5px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+
+    .log-table td {
+        padding: 18px; border-top: 1px solid #1a1a1a; border-bottom: 1px solid #1a1a1a;
+        font-family: 'Rajdhani', sans-serif;
+    }
+    
+    .log-table td:first-child { border-left: 1px solid #1a1a1a; border-radius: 6px 0 0 6px; }
+    .log-table td:last-child { border-right: 1px solid #1a1a1a; border-radius: 0 6px 6px 0; }
+
+    /* 3. Aksiyon Rozetleri (Action Badges) */
+    .action-badge {
+        padding: 5px 10px; border-radius: 4px; font-size: 11px; font-weight: 800;
+        text-transform: uppercase; letter-spacing: 1px; display: inline-block; min-width: 90px; text-align: center;
+        border: 1px solid transparent;
+    }
+
+    /* Renk Kodları */
+    .action-LOGIN { background: rgba(0, 255, 0, 0.1); color: #00ff00; border-color: rgba(0, 255, 0, 0.2); }
+    .action-FAILED_LOGIN { background: rgba(255, 0, 60, 0.1); color: #ff003c; border-color: rgba(255, 0, 60, 0.2); }
+    .action-KEY_GENERATE { background: rgba(0, 243, 255, 0.1); color: #00f3ff; border-color: rgba(0, 243, 255, 0.2); }
+    .action-BAN_USER { background: rgba(255, 0, 0, 0.2); color: #ff4444; border-color: #ff0000; }
+    .action-DELETE_USER { background: #333; color: #fff; border-color: #555; }
+    
+    /* Varsayılan Renk */
+    .action-DEFAULT { background: rgba(255, 255, 255, 0.05); color: #aaa; border-color: #444; }
+
+    /* 4. Terminal Fontu (Detaylar İçin) */
+    .log-details {
+        font-family: 'Courier New', monospace; font-size: 12px; color: #888;
+    }
+    .log-time {
+        color: #555; font-size: 12px; font-weight: 700;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="control-panel">
+    <div>
+        <h2 style="margin: 0; color: white; font-size: 24px; letter-spacing: 1px;">SECURITY AUDIT</h2>
+        <div style="color: #666; font-size: 12px; margin-top: 5px; font-family: monospace;">
+            ENCRYPTED LOGS: <span style="color: var(--neon-blue);">{{ logs|length }}</span> // TRACE LEVEL: HIGH
+        </div>
+    </div>
+
+    <div style="position: relative;">
+        <i class="fas fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #555;"></i>
+        <input type="text" id="logSearch" onkeyup="filterLogs()" placeholder="FILTER LOGS..." 
+               style="padding-left: 40px; background: rgba(0,0,0,0.3); border-color: #333; width: 250px; border-radius: 30px;">
+    </div>
+</div>
+
+<table class="log-table" id="auditTable">
+    <thead>
+        <tr>
+            <th>TIMESTAMP</th>
+            <th>ACTION PROTOCOL</th>
+            <th>DETAILS / TARGET</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for log in logs %}
+        <tr>
+            <td>
+                <div class="log-time">
+                    <i class="far fa-clock" style="margin-right: 5px;"></i> {{ log.timestamp }}
+                </div>
+            </td>
+            
+            <td>
+                <div class="action-badge action-{{ log.action if log.action in ['LOGIN', 'FAILED_LOGIN', 'KEY_GENERATE', 'BAN_USER', 'DELETE_USER'] else 'DEFAULT' }}">
+                    {{ log.action }}
+                </div>
+            </td>
+            
+            <td>
+                <div class="log-details">
+                    <i class="fas fa-terminal" style="margin-right: 8px; opacity: 0.5;"></i> {{ log.details }}
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="3" style="text-align: center; padding: 50px; color: #444;">
+                <i class="fas fa-shield-alt" style="font-size: 30px; margin-bottom: 15px; opacity: 0.3;"></i><br>
+                SYSTEM CLEAN. NO LOGS RECORDED.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterLogs() {
+        var input, filter, table, tr, td, i, txtValue;
+        input = document.getElementById("logSearch");
+        filter = input.value.toUpperCase();
+        table = document.getElementById("auditTable");
+        tr = table.getElementsByTagName("tr");
+
+        for (i = 0; i < tr.length; i++) {
+            // Action ve Details sütunlarında ara
+            tdAction = tr[i].getElementsByTagName("td")[1];
+            tdDetails = tr[i].getElementsByTagName("td")[2];
+            
+            if (tdAction || tdDetails) {
+                txtAction = tdAction.textContent || tdAction.innerText;
+                txtDetails = tdDetails.textContent || tdDetails.innerText;
+                
+                if (txtAction.toUpperCase().indexOf(filter) > -1 || txtDetails.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }       
+        }
+    }
+</script>
+{% endblock %}
