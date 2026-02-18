@@ -21,7 +21,8 @@ app.secret_key = os.getenv('SECRET_KEY', 'zbh_root_key_v1_gizli')
 ADMIN_USER = os.getenv('ADMIN_USER', 'admin') 
 ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123') 
 DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK', '')
-DATABASE_URL = os.getenv('DATABASE_URL') 
+# DATABASE_URL = os.getenv('DATABASE_URL')  <-- BUNU SİL VEYA YORUMA AL
+DATABASE_URL = "postgres://sifreler:adresler@dpg-blabla-a/zbh_db" # <-- DİREKT BURAYA YAPIŞTIR
 
 # --- GÜVENLİK AYARLARI ---
 BLOCK_TIME = 600  # 10 Dakika (Saniye cinsinden) ban süresi
@@ -443,3 +444,4 @@ def heartbeat():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+
