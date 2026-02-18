@@ -1,358 +1,602 @@
-{% extends "base.html" %}
+# ==============================================================================
+#  ZBH LICENSE SYSTEM | ULTIMATE PRO EDITION
+#  Developed for: Orhan Aga
+#  Version: 3.0 (PostgreSQL + Discord + Anti-Spam + Mobile Support)
+# ==============================================================================
 
-{% block title %}ZBH SYSTEM | License Authority{% endblock %}
+import os
+import time
+import uuid
+import datetime
+import logging
+import requests
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from functools import wraps
+from dotenv import load_dotenv
 
-{% block head %}
-<style>
-    /* --- ULTRA-PREMIUM STYLES (350+ PUAN) --- */
+# ------------------------------------------------------------------------------
+# 1. KONFİGÜRASYON VE GÜVENLİK AYARLARI
+# ------------------------------------------------------------------------------
 
-    /* 1. Üst Kontrol Paneli (Glassmorphism + Neon) */
-    .control-panel {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: linear-gradient(90deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.4) 100%);
-        padding: 25px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        margin-bottom: 30px;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        position: relative;
-        overflow: hidden;
-    }
+# .env dosyasındaki gizli şifreleri yükle
+load_dotenv()
+
+# Flask Uygulamasını Başlat
+app = Flask(__name__)
+
+# --- ORTAM DEĞİŞKENLERİ (ENVIRONMENT VARIABLES) ---
+# Eğer .env dosyasında bulamazsa varsayılan değerleri kullanır (Güvenlik için değiştirin!)
+app.secret_key = os.getenv('SECRET_KEY', 'zbh_root_key_v3_ultra_secure_999')
+
+# Admin Giriş Bilgileri (Render Environment kısmından değiştirilmesi önerilir)
+ADMIN_USER = os.getenv('ADMIN_USER', 'admin') 
+ADMIN_PASS = os.getenv('ADMIN_PASS', 'admin123') 
+
+# Dış Bağlantılar
+DISCORD_WEBHOOK = os.getenv('DISCORD_WEBHOOK', '') # Discord Webhook URL
+DATABASE_URL = os.getenv('DATABASE_URL') # PostgreSQL Bağlantı Linki
+
+# --- GÜVENLİK SABİTLERİ (CONSTANTS) ---
+BLOCK_TIME = 600       # Saniye cinsinden IP ban süresi (10 Dakika)
+MAX_ATTEMPTS = 5       # Bir IP'nin hata yapma hakkı
+IS_LOCKDOWN = False    # Acil Durum Kilidi (Panic Mode) - Başlangıçta Kapalı
+
+# --- RAM ÜZERİNDE GEÇİCİ VERİ TUTUCULAR ---
+# failed_attempts yapısı: { 'IP_ADRESI': [Hata_Sayisi, Ilk_Hata_Zamani] }
+failed_attempts = {} 
+
+# Loglama Ayarları (Konsola basar)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# ==============================================================================
+# 2. VERİTABANI KATMANI (DATABASE LAYER)
+# ==============================================================================
+
+def get_db_connection():
+    """
+    PostgreSQL veritabanına güvenli bir bağlantı açar.
+    Hata durumunda None döner ve log basar.
+    """
+    if not DATABASE_URL:
+        logger.error("KRİTİK HATA: DATABASE_URL bulunamadı! Render ayarlarını kontrol et.")
+        return None
     
-    /* Panel Altına Neon Çizgi */
-    .control-panel::after {
-        content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
-        background: linear-gradient(90deg, transparent, var(--neon-red), transparent);
-        opacity: 0.7;
-    }
+    try:
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        return conn
+    except psycopg2.Error as e:
+        logger.error(f"Veritabanı Bağlantı Hatası: {e}")
+        return None
 
-    /* 2. Cyber Search Bar (Animasyonlu) */
-    .search-wrapper { position: relative; width: 350px; }
+def init_db():
+    """
+    Sunucu ilk açıldığında çalışır.
+    Gerekli tablolar (keys, mapping, logs) veritabanında yoksa oluşturur.
+    Bu işlem 'Migration' mantığıyla çalışır.
+    """
+    logger.info("Veritabanı tabloları kontrol ediliyor...")
     
-    .search-wrapper input {
-        width: 100%;
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid #333;
-        padding: 15px 15px 15px 50px;
-        color: var(--neon-blue);
-        border-radius: 50px;
-        font-family: 'Rajdhani', sans-serif;
-        font-weight: 600;
-        font-size: 16px;
-        transition: all 0.4s ease;
-        letter-spacing: 1px;
-    }
-    
-    .search-wrapper input:focus {
-        background: rgba(0, 0, 0, 0.6);
-        border-color: var(--neon-blue);
-        box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
-        width: 105%; /* Hafif büyüme efekti */
-        transform: translateX(-2.5%);
-    }
+    conn = get_db_connection()
+    if not conn:
+        logger.critical("Veritabanına bağlanılamadı! Tablolar oluşturulamıyor.")
+        return
 
-    .search-wrapper i {
-        position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
-        color: #666; transition: 0.3s;
-    }
-    .search-wrapper input:focus + i { color: var(--neon-blue); }
-
-    /* 3. Tablo (High-End Görünüm) */
-    .user-table { width: 100%; border-collapse: separate; border-spacing: 0 12px; }
-    
-    .user-table th {
-        color: #555; font-size: 11px; font-weight: 800; letter-spacing: 2px;
-        padding: 0 20px 10px 20px; text-align: left;
-    }
-
-    .user-table tbody tr {
-        background: linear-gradient(145deg, #121212, #0e0e0e);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-    }
-
-    .user-table tbody tr td {
-        padding: 20px;
-        border-top: 1px solid #1a1a1a;
-        border-bottom: 1px solid #1a1a1a;
-    }
-    .user-table tbody tr td:first-child { border-left: 1px solid #1a1a1a; border-radius: 10px 0 0 10px; }
-    .user-table tbody tr td:last-child { border-right: 1px solid #1a1a1a; border-radius: 0 10px 10px 0; }
-
-    /* Hover Efekti (Neon Glow) */
-    .user-table tbody tr:hover {
-        transform: scale(1.01) translateY(-2px);
-        background: #181818;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-        z-index: 10;
-    }
-    .user-table tbody tr:hover td:first-child { border-left: 3px solid var(--neon-red); }
-
-    /* 4. Rozetler (Pulsing) */
-    .badge {
-        padding: 6px 15px; border-radius: 30px; font-size: 10px; font-weight: 800;
-        text-transform: uppercase; letter-spacing: 1.5px; display: inline-flex; align-items: center; gap: 6px;
-    }
-    .badge-dot { width: 6px; height: 6px; border-radius: 50%; }
-    
-    .badge.active { background: rgba(0, 255, 0, 0.08); color: #00ff00; border: 1px solid rgba(0, 255, 0, 0.2); }
-    .badge.active .badge-dot { background: #00ff00; box-shadow: 0 0 8px #00ff00; animation: pulse-green 2s infinite; }
-    
-    .badge.banned { background: rgba(255, 0, 60, 0.08); color: #ff003c; border: 1px solid rgba(255, 0, 60, 0.2); }
-    .badge.banned .badge-dot { background: #ff003c; box-shadow: 0 0 8px #ff003c; }
-
-    @keyframes pulse-green { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-
-    /* 5. Butonlar (Ghost & Neon) */
-    .btn-icon {
-        width: 38px; height: 38px; border-radius: 10px;
-        background: rgba(255,255,255,0.03); color: #666; border: 1px solid transparent;
-        cursor: pointer; transition: 0.3s; display: flex; align-items: center; justify-content: center;
-    }
-    .btn-icon:hover { transform: translateY(-3px); }
-    .btn-icon.copy:hover { background: rgba(0, 243, 255, 0.1); color: var(--neon-blue); border-color: var(--neon-blue); }
-    .btn-icon.ban:hover { background: rgba(255, 0, 60, 0.1); color: var(--neon-red); border-color: var(--neon-red); }
-    .btn-icon.del:hover { background: #fff; color: #000; border-color: #fff; }
-
-    /* 6. Modal Animasyon */
-    @keyframes slideIn {
-        from { opacity: 0; transform: translateY(-50px) scale(0.9); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .modal-content { animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-
-</style>
-{% endblock %}
-
-{% block content %}
-
-<div class="control-panel">
-    <div>
-        <h2 style="margin: 0; color: white; font-size: 26px; letter-spacing: 1px; text-shadow: 0 0 20px rgba(255,255,255,0.1);">LICENSE DATABASE</h2>
-        <div style="color: #666; font-size: 12px; margin-top: 5px; font-family: monospace;">
-            ENCRYPTED RECORDS: <span style="color: var(--neon-blue);">{{ keys|length }}</span> // SYSTEM: SECURE
-        </div>
-    </div>
-
-    <div style="display: flex; gap: 25px; align-items: center;">
-        <div class="search-wrapper">
-            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="SEARCH KEY / HWID / TAG...">
-            <i class="fas fa-search"></i>
-        </div>
+    try:
+        cur = conn.cursor()
         
-        <button class="btn-action" onclick="openModal()" style="box-shadow: 0 0 15px rgba(255, 0, 60, 0.3);">
-            <i class="fas fa-plus-hexagon"></i> GENERATE
-        </button>
-    </div>
-</div>
-
-<table class="user-table" id="licenseTable">
-    <thead>
-        <tr>
-            <th>LICENSE KEY</th>
-            <th>STATUS</th>
-            <th>ACCESS LEVEL</th>
-            <th>HARDWARE ID</th>
-            <th>EXPIRATION</th>
-            <th style="text-align: right;">CONTROLS</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for key in keys %}
-        <tr>
-            <td>
-                <div style="font-family: 'Courier New', monospace; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px; font-size: 15px;">
-                    {% if key.type == 'VIP' %} 
-                        <i class="fas fa-crown" style="color: #ffd700; filter: drop-shadow(0 0 5px #ffd700);"></i> 
-                    {% else %}
-                        <i class="fas fa-key" style="color: #444;"></i>
-                    {% endif %}
-                    <span id="key-text-{{ loop.index }}" style="letter-spacing: 1px;">{{ key.key_code }}</span>
-                </div>
-            </td>
-            
-            <td>
-                <div class="badge {{ 'active' if key.status == 'active' else 'banned' }}">
-                    <div class="badge-dot"></div>
-                    {{ key.status }}
-                </div>
-            </td>
-            
-            <td>
-    {% if key['type'] == 'VIP' %}
-        <div style="color: #ffd700; font-weight: 700; letter-spacing: 1px; font-size: 12px;">
-            <i class="fas fa-crown" style="margin-right: 5px;"></i> VIP
-        </div>
-    {% else %}
-        <div style="color: #888; font-weight: 700; letter-spacing: 1px; font-size: 12px;">
-            <i class="fas fa-user" style="margin-right: 5px;"></i> STANDARD
-        </div>
-    {% endif %}
-</td>
-            
-            <td style="font-family: monospace; color: #555; font-size: 13px;">
-                {% if key.hwid %}
-                    {{ key.hwid[:20] }}<span style="opacity:0.3">...</span>
-                {% else %}
-                    <span style="opacity: 0.2; font-style: italic;">-- NO CONNECTION --</span>
-                {% endif %}
-            </td>
-            
-            <td style="color: #777; font-size: 13px; font-weight: 600;">
-                {{ key.expires_at[:16] }}
-            </td>
-            
-            <td>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button class="btn-icon copy" onclick="copyToClipboard('key-text-{{ loop.index }}')" title="Copy Key">
-                        <i class="far fa-copy"></i>
-                    </button>
-                    <button class="btn-icon ban" onclick="banUser('{{ key.key_code }}')" title="Ban User">
-                        <i class="fas fa-ban"></i>
-                    </button>
-                    <button class="btn-icon del" onclick="deleteUser('{{ key.key_code }}')" title="Delete Record">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="6" style="text-align: center; padding: 60px; color: #444; background: transparent; box-shadow: none;">
-                <i class="fas fa-folder-open" style="font-size: 40px; margin-bottom: 20px; opacity: 0.5;"></i><br>
-                DATABASE IS EMPTY
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<div id="keyModal" class="modal">
-    <div class="modal-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid #222; padding-bottom: 20px;">
-            <div style="font-size: 22px; font-weight: 800; color: white; letter-spacing: 1px;">
-                <span style="color: var(--neon-red);">//</span> GENERATE LICENSE
-            </div>
-            <i class="fas fa-times" onclick="closeModal()" style="cursor: pointer; color: #666; transition: 0.3s;"></i>
-        </div>
+        # 1. KEYS TABLOSU: Kullanıcı anahtarlarını tutar
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS keys (
+                key_code VARCHAR(100) PRIMARY KEY,
+                hwid VARCHAR(255),
+                status VARCHAR(20) DEFAULT 'active',
+                expires_at TIMESTAMP,
+                type VARCHAR(20) DEFAULT 'Standard',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ip_address VARCHAR(50)
+            );
+        ''')
         
-        <div style="text-align: left; margin-bottom: 20px;">
-            <label style="color: var(--neon-blue);">ACCESS DURATION</label>
-            <select id="keyDuration" style="background: #0a0a0a; border-color: #333;">
-                <option value="1_day">1 Day (24 Hours)</option>
-                <option value="7_day">1 Week (7 Days)</option>
-                <option value="30_day">1 Month (30 Days)</option>
-                <option value="lifetime" style="color: #ffd700; font-weight: bold;">∞ LIFETIME ACCESS</option>
-            </select>
-        </div>
+        # 2. MAPPING TABLOSU: Oyun ID'si ile Script URL'sini eşleştirir
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS mapping (
+                id SERIAL PRIMARY KEY,
+                game_name VARCHAR(100),
+                place_id VARCHAR(50),
+                script_url TEXT
+            );
+        ''')
+        
+        # 3. AUDIT LOGS TABLOSU: Sistemdeki tüm hareketleri kaydeder
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                action VARCHAR(50),
+                details TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        ''')
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        logger.info("✅ Veritabanı tabloları başarıyla hazırlandı.")
+        
+    except Exception as e:
+        logger.error(f"Tablo Oluşturma Hatası (Init DB): {e}")
 
-        <div style="margin-bottom: 30px; background: rgba(255, 215, 0, 0.03); border: 1px solid rgba(255, 215, 0, 0.1); padding: 20px; border-radius: 8px; display: flex; align-items: center; justify-content: space-between;">
-            <div>
-                <div style="color: #ffd700; font-weight: 800; letter-spacing: 1px;">VIP PRIVILEGES</div>
-                <div style="color: #666; font-size: 11px; margin-top: 3px;">Access to 'High-Risk' scripts.</div>
-            </div>
+# Uygulama başlarken veritabanını başlat
+init_db()
+
+# ==============================================================================
+# 3. YARDIMCI SERVİSLER (SERVICES)
+# ==============================================================================
+
+def log_action(action, details, notify_discord=False, color=0x00ff00):
+    """
+    Sistemdeki önemli olayları kaydeder.
+    
+    Args:
+        action (str): Olayın kısa adı (örn: LOGIN_SUCCESS)
+        details (str): Olayın detayı
+        notify_discord (bool): True ise Discord'a mesaj atar.
+        color (hex): Discord embed rengi.
+    """
+    # 1. Veritabanına Yaz
+    try:
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("INSERT INTO audit_logs (action, details) VALUES (%s, %s)", (action, details))
+            conn.commit()
+            cur.close()
+            conn.close()
+    except Exception as e:
+        logger.error(f"DB Log Hatası: {e}")
+
+    # 2. Discord'a Gönder (Webhook varsa)
+    if notify_discord and DISCORD_WEBHOOK:
+        payload = {
+            "embeds": [{
+                "title": f"🛡️ ZBH SYSTEM | {action}",
+                "description": details,
+                "color": color,
+                "footer": {"text": "ZBH Security Protocol v3.0"},
+                "timestamp": datetime.datetime.now().isoformat()
+            }]
+        }
+        try:
+            requests.post(DISCORD_WEBHOOK, json=payload, timeout=3)
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Discord Webhook Hatası: {e}")
+
+def login_required(f):
+    """
+    Flask Decorator: Kullanıcı giriş yapmamışsa login sayfasına yönlendirir.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            # Oturum yoksa, login sayfasına git
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ==============================================================================
+# 4. WEB ARAYÜZÜ ROTALARI (FRONTEND ROUTES)
+# ==============================================================================
+
+@app.route('/')
+def index():
+    """Ana Sayfa: Giriş yapmışsa Dashboard'a, yapmamışsa Login'e atar."""
+    if 'logged_in' in session:
+        return redirect(url_for('dashboard'))
+    else:
+        return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Giriş Sayfası İşlemleri"""
+    error = None
+    if request.method == 'POST':
+        user_ip = request.remote_addr
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Admin Doğrulama
+        if username == ADMIN_USER and password == ADMIN_PASS:
+            session['logged_in'] = True
+            log_action("ADMIN_LOGIN", f"Yönetici girişi yapıldı. IP: {user_ip}", True, 0x00FF00)
+            return redirect(url_for('dashboard'))
+        else:
+            log_action("FAILED_LOGIN", f"Hatalı giriş denemesi! IP: {user_ip}", True, 0xFF0000)
+            error = "Hatalı kullanıcı adı veya şifre Aga!"
             
-            <label class="switch" style="position: relative; display: inline-block; width: 46px; height: 24px;">
-                <input type="checkbox" id="isVip" style="opacity: 0; width: 0; height: 0;">
-                <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #222; transition: .4s; border-radius: 34px; border: 1px solid #444;"></span>
-                <span class="slider-dot" style="position: absolute; content: ''; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: #888; transition: .4s; border-radius: 50%;"></span>
-            </label>
-            <style>
-                #isVip:checked + span { background-color: rgba(255, 215, 0, 0.2); border-color: #ffd700; }
-                #isVip:checked + span + .slider-dot { transform: translateX(22px); background-color: #ffd700; box-shadow: 0 0 10px #ffd700; }
-            </style>
-        </div>
+    return render_template('login.html', error=error)
 
-        <button class="btn-action" style="width: 100%; justify-content: center; padding: 15px;" onclick="generateKey()">
-            INITIATE GENERATION
-        </button>
-    </div>
-</div>
+@app.route('/logout')
+def logout():
+    """Oturumu Kapatır"""
+    session.clear()
+    return redirect(url_for('login'))
 
-{% endblock %}
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Ana Kontrol Paneli (Dashboard)"""
+    conn = get_db_connection()
+    if not conn: return "Veritabanı Hatası!", 500
+    
+    cur = conn.cursor()
+    
+    # İstatistikleri Topla
+    stats = {'total': 0, 'active': 0, 'vip': 0, 'banned': 0}
+    try:
+        cur.execute("SELECT COUNT(*) FROM keys")
+        stats['total'] = cur.fetchone()[0]
+        
+        cur.execute("SELECT COUNT(*) FROM keys WHERE status='active'")
+        stats['active'] = cur.fetchone()[0]
+        
+        cur.execute("SELECT COUNT(*) FROM keys WHERE type='VIP'")
+        stats['vip'] = cur.fetchone()[0]
+        
+        cur.execute("SELECT COUNT(*) FROM keys WHERE status='banned'")
+        stats['banned'] = cur.fetchone()[0]
+    except Exception as e:
+        logger.error(f"Dashboard İstatistik Hatası: {e}")
+    finally:
+        cur.close()
+        conn.close()
+    
+    return render_template('dashboard.html', 
+                         total=stats['total'], 
+                         active=stats['active'], 
+                         vip=stats['vip'], 
+                         banned=stats['banned'], 
+                         active_page='dashboard')
 
-{% block scripts %}
-<script>
-    // FİLTRELEME
-    function filterTable() {
-        var input = document.getElementById("searchInput");
-        var filter = input.value.toUpperCase();
-        var table = document.getElementById("licenseTable");
-        var tr = table.getElementsByTagName("tr");
+@app.route('/users')
+@login_required
+def users():
+    """Kullanıcı Listesi ve Yönetimi"""
+    conn = get_db_connection()
+    if not conn: return "DB Error", 500
+    
+    # RealDictCursor ile verileri {key: value} formatında çekeriz
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM keys ORDER BY created_at DESC")
+    keys = cur.fetchall()
+    
+    cur.close()
+    conn.close()
+    return render_template('users.html', keys=keys, active_page='users')
 
-        for (i = 0; i < tr.length; i++) {
-            var tdKey = tr[i].getElementsByTagName("td")[0];
-            var tdHwid = tr[i].getElementsByTagName("td")[3];
-            var tdStatus = tr[i].getElementsByTagName("td")[1];
+@app.route('/mapping')
+@login_required
+def mapping():
+    """Oyun ve Script Eşleştirme Sayfası"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM mapping ORDER BY id DESC")
+    mappings = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('mapping.html', mappings=mappings, active_page='mapping')
+
+@app.route('/audit-logs')
+@login_required
+def audit_logs():
+    """Sistem Loglarını Görüntüleme"""
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 100")
+    logs = cur.fetchall()
+    cur.close()
+    conn.close()
+    return render_template('audit_logs.html', logs=logs, active_page='audit_logs')
+
+@app.route('/settings')
+@login_required
+def settings():
+    """Ayarlar Sayfası"""
+    return render_template('settings.html', active_page='settings')
+
+# ==============================================================================
+# 5. API SİSTEMİ (ROBLOX SCRIPT & AJAX REQUESTS)
+# ==============================================================================
+
+@app.route('/api/verify', methods=['GET'])
+def verify():
+    """
+    Roblox Script'inin bağlandığı ana doğrulama noktası.
+    Rate Limit ve Panic Mode koruması içerir.
+    """
+    global IS_LOCKDOWN
+    client_ip = request.remote_addr
+    
+    # [1] PANIC MODE KONTROLÜ
+    if IS_LOCKDOWN:
+        return jsonify({"status": "error", "msg": "SYSTEM_LOCKDOWN_ACTIVE"})
+
+    # [2] ANTI-SPAM (RATE LIMITING) MEKANİZMASI
+    current_time = time.time()
+    
+    # IP daha önce hata yaptıysa kontrol et
+    if client_ip in failed_attempts:
+        attempts, first_time = failed_attempts[client_ip]
+        
+        # Eğer hata sınırı aşıldıysa
+        if attempts >= MAX_ATTEMPTS:
+            elapsed_time = current_time - first_time
+            # Süre dolmadıysa engelle
+            if elapsed_time < BLOCK_TIME:
+                remaining_time = int(BLOCK_TIME - elapsed_time)
+                return jsonify({
+                    "status": "error", 
+                    "msg": f"BLOCKED: Too Many Requests. Wait {remaining_time}s"
+                })
+            else:
+                # Süre dolduysa affet ve listeden sil
+                del failed_attempts[client_ip]
+
+    # [3] GİRİŞ PARAMETRELERİNİ AL
+    key = request.args.get('key')
+    hwid = request.args.get('hwid')
+    place_id = request.args.get('placeid')
+
+    # Parametre eksikse reddet
+    if not key: 
+        return jsonify({"status": "error", "msg": "MISSING_KEY_PARAMETER"})
+
+    # [4] VERİTABANI SORGUSU
+    conn = get_db_connection()
+    if not conn: return jsonify({"status": "error", "msg": "SERVER_DB_ERROR"})
+    
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # Key'i ara (SQL Injection korumalı)
+    cur.execute("SELECT * FROM keys WHERE key_code = %s", (key,))
+    user = cur.fetchone()
+    
+    response = {"status": "error", "msg": "INVALID_KEY"}
+    
+    # Kullanıcı var mı?
+    if user:
+        # A. Kullanıcı Banlı mı?
+        if user['status'] == 'banned':
+            response['msg'] = "ACCOUNT_BANNED"
             
-            if (tdKey || tdHwid) {
-                var txtKey = tdKey.textContent || tdKey.innerText;
-                var txtHwid = tdHwid.textContent || tdHwid.innerText;
-                var txtStatus = tdStatus.textContent || tdStatus.innerText;
+        # B. İlk Giriş mi? (HWID Boşsa)
+        elif not user['hwid']:
+            # HWID'yi ve IP'yi kaydet (Binding)
+            update_cur = conn.cursor()
+            update_cur.execute(
+                "UPDATE keys SET hwid = %s, ip_address = %s WHERE key_code = %s", 
+                (hwid, client_ip, key)
+            )
+            conn.commit()
+            update_cur.close()
+            
+            response = {"status": "success", "type": user['type']}
+            log_action("KEY_BOUND", f"Key: {key} bound to HWID: {hwid}", True, 0x00FFFF)
+            
+        # C. HWID Eşleşiyor mu?
+        elif user['hwid'] != hwid:
+            response['msg'] = "HWID_MISMATCH"
+            
+            # Hatalı giriş sayısını artır
+            if client_ip not in failed_attempts:
+                failed_attempts[client_ip] = [1, current_time]
+            else:
+                failed_attempts[client_ip][0] += 1
                 
-                if (txtKey.toUpperCase().indexOf(filter) > -1 || 
-                    txtHwid.toUpperCase().indexOf(filter) > -1 ||
-                    txtStatus.toUpperCase().indexOf(filter) > -1) {
-                    tr[i].style.display = "";
-                } else {
-                    tr[i].style.display = "none";
-                }
-            }       
-        }
-    }
+            log_action("SECURITY_ALERT", f"HWID Uyuşmazlığı! Key: {key} IP: {client_ip}", True, 0xFF0000)
+            
+        # D. Her Şey Yolunda
+        else:
+            response = {"status": "success", "type": user['type']}
+            
+            # Son IP adresini güncelle
+            ip_cur = conn.cursor()
+            ip_cur.execute("UPDATE keys SET ip_address = %s WHERE key_code = %s", (client_ip, key))
+            conn.commit()
+            ip_cur.close()
 
-    // KOPYALAMA
-    function copyToClipboard(elementId) {
-        var text = document.getElementById(elementId).innerText;
-        navigator.clipboard.writeText(text).then(function() {
-            // Basit bir görsel geri bildirim (Button rengini değiştir)
-            var btn = event.currentTarget;
-            var originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-check" style="color:#00ff00;"></i>';
-            setTimeout(() => { btn.innerHTML = originalHtml; }, 1000);
-        });
-    }
+    # [5] SCRIPT URL GÖNDERME (Eğer giriş başarılıysa)
+    if response['status'] == 'success':
+        # Başarılı olduğu için ceza listesinden çıkar
+        if client_ip in failed_attempts: 
+            del failed_attempts[client_ip]
+            
+        # Oyun ID'sine göre scripti bul
+        cur.execute("SELECT script_url FROM mapping WHERE place_id = %s", (place_id,))
+        mapping_row = cur.fetchone()
+        
+        response['script_url'] = mapping_row['script_url'] if mapping_row else ""
+        
+        # İsteğe bağlı: VIP girişlerini detaylı logla
+        if user and user['type'] == 'VIP':
+            pass # DB şişmesin diye kapalı, açmak için: log_action(...)
 
-    // MODAL
-    function openModal() { document.getElementById('keyModal').style.display = 'flex'; }
-    function closeModal() { document.getElementById('keyModal').style.display = 'none'; }
+    cur.close()
+    conn.close()
+    return jsonify(response)
+
+# --- KEY OLUŞTURMA (GENERATE KEY) ---
+@app.route('/api/generate_key', methods=['POST'])
+@login_required
+def generate_key():
+    """Yeni bir lisans anahtarı üretir ve veritabanına kaydeder."""
+    try:
+        data = request.json
+        duration = data.get('duration')
+        is_vip = data.get('is_vip')
+        
+        # Süre hesaplama
+        days = 3650 if duration == 'lifetime' else (30 if duration == '30_day' else 7)
+        expires_at = datetime.datetime.now() + datetime.timedelta(days=days)
+        
+        # Benzersiz Anahtar Üretimi
+        prefix = "ZBH-VIP" if is_vip else "ZBH-GEN"
+        unique_str = str(uuid.uuid4())[:8].upper()
+        key_code = f"{prefix}-{unique_str}"
+        
+        # DB Kayıt
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO keys (key_code, status, expires_at, type, created_at) VALUES (%s, %s, %s, %s, NOW())",
+            (key_code, 'active', expires_at, 'VIP' if is_vip else 'Standard')
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        log_action("KEY_GENERATED", f"Yeni Anahtar: {key_code} ({duration})", True, 0x00FF00)
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        logger.error(f"Key Gen Hatası: {e}")
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- HWID SIFIRLAMA (RESET) ---
+@app.route('/api/reset_hwid', methods=['POST'])
+@login_required
+def reset_hwid():
+    """Kullanıcının kilitli olduğu cihazı (HWID) sıfırlar."""
+    try:
+        data = request.json
+        key = data.get('key')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE keys SET hwid = NULL WHERE key_code = %s", (key,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        log_action("HWID_RESET", f"HWID Sıfırlandı: {key}", True, 0xFFA500)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- KULLANICI BANLAMA ---
+@app.route('/api/ban_user', methods=['POST'])
+@login_required
+def ban_user():
+    """Kullanıcıyı süresiz banlar."""
+    try:
+        data = request.json
+        key = data.get('key')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE keys SET status = 'banned' WHERE key_code = %s", (key,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        log_action("USER_BANNED", f"Kullanıcı Banlandı: {key}", True, 0xFF0000)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- KULLANICI SİLME ---
+@app.route('/api/delete_user', methods=['POST'])
+@login_required
+def delete_user():
+    """Kullanıcıyı veritabanından tamamen siler."""
+    try:
+        data = request.json
+        key = data.get('key')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM keys WHERE key_code = %s", (key,))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        log_action("USER_DELETED", f"Kullanıcı Silindi: {key}", False)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- MAPPING EKLEME ---
+@app.route('/api/add_mapping', methods=['POST'])
+@login_required
+def add_mapping():
+    """Yeni oyun-script eşleştirmesi ekler."""
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO mapping (game_name, place_id, script_url) VALUES (%s, %s, %s)", 
+            (data['game_name'], data['place_id'], data['script_url'])
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- MAPPING SİLME ---
+@app.route('/api/delete_mapping', methods=['POST'])
+@login_required
+def delete_mapping():
+    """Oyun-script eşleştirmesini siler."""
+    try:
+        data = request.json
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM mapping WHERE id = %s", (data['id'],))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "msg": str(e)})
+
+# --- PANIC MODE (SİSTEM KİLİTLEME) ---
+@app.route('/api/panic_toggle', methods=['POST'])
+@login_required
+def panic_toggle():
+    """Tüm sistemi anında kilitler veya açar."""
+    global IS_LOCKDOWN
+    data = request.json
     
-    // API
-    async function generateKey() {
-        const duration = document.getElementById('keyDuration').value;
-        const isVip = document.getElementById('isVip').checked;
-        const btn = document.querySelector('#keyModal .btn-action');
-        
-        btn.innerHTML = '<i class="fas fa-cog fa-spin"></i> PROCESSING...';
-        
-        try {
-            const res = await fetch('/api/generate_key', {
-                method: 'POST', headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ duration: duration, is_vip: isVip })
-            });
-            const result = await res.json();
-            if (result.success) location.reload();
-        } catch (e) {
-            alert("System Error");
-            btn.innerText = "TRY AGAIN";
-        }
-    }
+    if 'state' in data: 
+        IS_LOCKDOWN = data['state']
+    else: 
+        IS_LOCKDOWN = not IS_LOCKDOWN
+    
+    log_action("PANIC_MODE", f"Sistem Kilidi Durumu: {IS_LOCKDOWN}", True, 0xFF0000)
+    return jsonify({"success": True, "state": IS_LOCKDOWN})
 
-    async function banUser(key) {
-        if(confirm('CONFIRM: Terminate User Access?')) {
-            const res = await fetch('/api/ban_user', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ key: key }) });
-            if ((await res.json()).success) location.reload();
-        }
-    }
+# --- HEARTBEAT (UPTIME MONITOR) ---
+@app.route('/api/heartbeat')
+def heartbeat():
+    """UptimeRobot gibi servisler için canlılık sinyali."""
+    return jsonify({
+        "status": "alive", 
+        "online": True,
+        "timestamp": time.time()
+    })
 
-    async function deleteUser(key) {
-        if(confirm('CONFIRM: Wipe User Data?')) {
-            const res = await fetch('/api/delete_user', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ key: key }) });
-            if ((await res.json()).success) location.reload();
-        }
-    }
-</script>
-{% endblock %}
+# ==============================================================================
+# 6. SUNUCU BAŞLATMA (ENTRY POINT)
+# ==============================================================================
+
+if __name__ == '__main__':
+    # Render tarafından atanan portu al, yoksa 5000 kullan
+    port = int(os.environ.get("PORT", 5000))
+    
+    # Uygulamayı başlat
+    # Not: debug=True prodüksiyon ortamında risklidir, Render'da kapalı kalmalı.
+    app.run(host='0.0.0.0', port=port)
